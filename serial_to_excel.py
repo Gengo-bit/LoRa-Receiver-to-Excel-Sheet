@@ -1,6 +1,10 @@
 import serial
 import openpyxl
 from datetime import datetime
+import re
+
+def clean_string(s):
+    return re.sub(r'[\x00-\x1F\x7F-\x9F]', '', s)
 
 ser = serial.Serial('COM10', 115200) 
 
@@ -17,8 +21,8 @@ try:
 
         if "," in line:
             parts = line.split(",", 1)  # split on first comma
-            timestamp = parts[0].strip()
-            packet = parts[1].strip()
+            timestamp = clean_string(parts[0].strip())
+            packet = clean_string(parts[1].strip())
 
             print(f"{timestamp} -> {packet}")
 
