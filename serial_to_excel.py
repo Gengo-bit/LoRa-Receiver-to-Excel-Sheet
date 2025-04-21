@@ -21,7 +21,7 @@ try:
             packet = parts[1].strip()
 
             print(f"{timestamp} -> {packet}")
-            
+
             sheet.append([timestamp, packet])
             wb.save("lora_data.xlsx")
         else:
