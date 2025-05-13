@@ -7,44 +7,55 @@ last_values = {}
 data_losses = {}
 packet_counts = {}
 resets_detected = {}
+cumulative_received = {}
 
 for row in sheet.iter_rows(min_row=2, values_only=True):
     timestamp, packet = row
 
     if packet and ":" in packet:
         address, value = packet.split(":")
-        value = int(value)
+        try:
+            value = int(value)
+        except ValueError:
+            continue  # skip if value is not an integer
 
-        packet_counts[address] = packet_counts.get(address, 0) + 1
+        packet_counts.setdefault(address, 0)
+        data_losses.setdefault(address, 0)
+        resets_detected.setdefault(address, 0)
+        cumulative_received.setdefault(address, 0)
 
         if address in last_values:
-            # reset detected
-            if value < last_values[address]:
-                print(f"[RESET] {address} reset detected at value {value} (previous was {last_values[address]})")
-                resets_detected[address] = resets_detected.get(address, 0) + 1
+            last_val = last_values[address]
 
-            # normal loss detection if value increased by more than 1
-            elif value > last_values[address] + 1:
-                loss_count = value - last_values[address] - 1
-                print(f"[LOSS] {loss_count} missing packet(s) for {address} between {last_values[address]} and {value}")
-                data_losses[address] = data_losses.get(address, 0) + loss_count
+            if value < last_val:
 
-        # update last value
+                print(f"[RESET] {address} reset at value {value} (previous was {last_val})")
+                resets_detected[address] += 1
+                cumulative_received[address] += last_val + 1  # +1 because 0 is also a valid packet
+            elif value > last_val + 1:
+                loss_count = value - last_val - 1
+                print(f"[LOSS] {loss_count} packet(s) lost for {address} between {last_val} and {value}")
+                data_losses[address] += loss_count
+
         last_values[address] = value
+        packet_counts[address] += 1
 
-print("\n--- Data Loss Summary (with Resets) ---")
+# add last known value to cumulative count
+for address in last_values:
+    cumulative_received[address] += last_values[address] + 1  # +1 to include current value
+
 for address in sorted(packet_counts.keys()):
-    losses = data_losses.get(address, 0)
-    total_packets = packet_counts.get(address, 0)
-    resets = resets_detected.get(address, 0)
+    losses = data_losses[address]
+    resets = resets_detected[address]
+    total_received = cumulative_received[address]
 
-    if total_packets + losses > 0:
-        loss_percentage = (losses / (total_packets + losses)) * 100
+    if total_received + losses > 0:
+        loss_percentage = (losses / (total_received + losses)) * 100
     else:
         loss_percentage = 0.0
 
     print(f"{address}:")
-    print(f"  Total Packets Received: {total_packets}")
+    print(f"  Total Packets Received (including resets): {total_received}")
     print(f"  Packets Lost: {losses}")
     print(f"  Data Loss Percentage: {loss_percentage:.2f}%")
     print(f"  Resets Detected: {resets}\n")
